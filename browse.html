@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Proxy Browser</title>
+    <style>
+      body { font-family: sans-serif; margin: 1em; background: #fafaff; }
+      input[type=text] { width: 70vw; font-size: 1em; }
+      button, input[type=submit] { font-size: 1em; }
+      iframe { width: 96vw; height: 80vh; border: 1px solid #888; background: #fff; }
+    </style>
+</head>
+<body>
+    <h1>Simple Proxy Browser</h1>
+    <form id="address-form">
+        <input id="url-input" type="text" placeholder="https://example.com" required>
+        <input type="submit" value="Go">
+    </form>
+    <iframe id="proxy-frame" src="" title="Simplified Website"></iframe>
+    <script>
+    // Helper to get "url" parameter from the address bar
+    function getQueryParam(name) {
+        var m = location.search.match(new RegExp('[?&]' + name + '=([^&]+)'));
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+    // Set initial URL from browser address bar's "url" parameter
+    var input = document.getElementById('url-input');
+    var frame = document.getElementById('proxy-frame');
+    var initialUrl = getQueryParam('url');
+    if (initialUrl) {
+        input.value = initialUrl;
+        frame.src = '/api/proxy?url=' + encodeURIComponent(initialUrl);
+    }
+    document.getElementById('address-form').onsubmit = function(e) {
+        e.preventDefault();
+        var val = input.value;
+        // Update address bar without reloading page
+        var newQuery = '?url=' + encodeURIComponent(val);
+        window.history.replaceState({}, '', newQuery);
+        frame.src = '/api/proxy?url=' + encodeURIComponent(val);
+    };
+    </script>
+</body>
+</html>
