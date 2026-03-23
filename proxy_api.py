@@ -1,33 +1,30 @@
-from flask import Flask, Response
-import requests
-from bs4 import BeautifulSoup
+import http.server
 
-app = Flask(__name__)
+PORT = 8080
+HandlerClass = http.server.SimpleHTTPRequestHandler
 
-@app.route('/<path:url>')
-def proxy(url):
-    # Prepend "https://" if no scheme is provided
-    if not url.startswith("http"):
-        url = "https://" + url
-    try:
-        # Fetch the live page with a User-Agent header
-        resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+# The right class for proxy mode is named 'http.server.ThreadingHTTPServer' (Python 3.7+) and '--bind'/'--proxy' flags.
+# But for a real proxy you'll want a library like PySocks, or you can use 3rd party like 'python3 -m http.server --bind 0.0.0.0 --cgi --directory . --proxy' (Python 3.11+)
+# For DSi, here's the easiest library-based proxy:
 
-        # Parse and simplify HTML
-        soup = BeautifulSoup(resp.content, "html.parser")
-        for tag in soup(["script", "style", "noscript", "img"]):
-            tag.decompose()  # Remove these tags for retro/browser compatibility
+try:
+    from http.server import ThreadingHTTPServer
+except ImportError:
+    from socketserver import ThreadingTCPServer as ThreadingHTTPServer
 
-        # Serve the simplified HTML
-        return Response(
-            str(soup),
-            content_type=resp.headers.get("Content-Type", "text/html")
-        )
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        # Show the full Python error report on failure
-        return f"<h1>Proxy Error</h1><pre>{tb}</pre>", 502
+class Proxy(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        import urllib.request
+        url = self.path
+        if url.startswith('http://') or url.startswith('https://'):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            with urllib.request.urlopen(url) as f:
+                self.copyfile(f, self.wfile)
+        else:
+            self.send_error(400, "Bad request")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+httpd = ThreadingHTTPServer(('0.0.0.0', PORT), Proxy)
+print(f"Serving HTTP proxy on port {PORT}")
+httpd.serve_forever()
